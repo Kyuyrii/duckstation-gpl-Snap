@@ -1,0 +1,144 @@
+name: duckstation-gpl
+base: core24
+version: '0.1-7371'
+platforms:
+  amd64:
+    build-on: [amd64]
+    build-for: [amd64]
+summary: PlayStation Emulator
+description: |
+  DuckStation is an simulator/emulator of the Sony PlayStation(TM) console, focusing on playability, speed, and long-term maintainability. The goal is to be as accurate as possible while maintaining performance suitable for low-end devices.
+
+  "PlayStation" and "PSX" are registered trademarks of Sony Interactive Entertainment Europe Limited. This project is not affiliated in any way with Sony Interactive Entertainment.
+grade: stable
+confinement: strict
+compression: lzo
+
+apps:
+  duckstation-gpl:
+    command-chain:
+      - snap/command-chain/gpu-2404-wrapper
+      - snap/command-chain/desktop-launch6
+    command: usr/games/duckstation-qt
+    desktop: usr/share/applications/org.duckstation.DuckStation.desktop
+    common-id: org.duckstation.DuckStation
+    environment:
+      SNAP_DESKTOP_RUNTIME: $SNAP/kf6
+      QT_QPA_PLATFORM: xcb
+      GTK_USE_PORTAL: "1"
+      QT_VERSION: "6"
+    plugs:
+      - desktop
+      - desktop-legacy
+      - unity7
+      - opengl
+      - wayland
+      - x11
+      - screen-inhibit-control
+      - audio-playback
+      - network
+      - network-bind
+      - home
+      - removable-media
+      - mount-observe
+      - joystick
+      - bluez
+      - udisks2
+
+hooks:
+  configure:
+    command-chain:
+      - snap/command-chain/hooks-configure-desktop
+
+plugs:
+  desktop:
+    mount-host-font-cache: false
+  gtk-2-themes:
+    interface: content
+    target: $SNAP/data-dir/themes
+    default-provider: gtk-common-themes
+  gtk-3-themes:
+    interface: content
+    target: $SNAP/data-dir/themes
+    default-provider: gtk-common-themes
+  icon-themes:
+    interface: content
+    target: $SNAP/data-dir/icons
+    default-provider: gtk-common-themes
+  sound-themes:
+    interface: content
+    target: $SNAP/data-dir/sounds
+    default-provider: gtk-common-themes
+  kf6-core24:
+    content: kf6-core24-all
+    interface: content
+    target: $SNAP/kf6
+    default-provider: kf6-core24
+  gpu-2404:
+    interface: content
+    target: $SNAP/gpu-2404
+    default-provider: mesa-2404
+  shared-memory:
+    private: true
+
+parts:
+  duckstation-gpl:
+    plugin: nil
+    build-packages:
+      - wget
+    override-build: |
+      wget https://github.com/Kyuyrii/Duckstation-GPL3/releases/download/v0.1-7371/DuckStation-x64.AppImage
+      chmod +x DuckStation-x64.AppImage
+      ./DuckStation-x64.AppImage --appimage-extract
+      mkdir -p $CRAFT_PART_INSTALL/usr
+      mkdir -p $CRAFT_PART_INSTALL/usr/share/icons/hicolor/scalable/apps
+      mkdir -p $CRAFT_PART_INSTALL/usr/share/applications
+      mkdir -p $CRAFT_PART_INSTALL/usr/lib/x86_64-linux-gnu
+      sed -i 's|Name=DuckStation|Name=DuckStation GPL [NyKyu]|' squashfs-root/usr/share/applications/org.duckstation.DuckStation.desktop
+      sed -i 's|Icon=org.duckstation.DuckStation|Icon=${SNAP}/usr/share/icons/hicolor/scalable/apps/org.duckstation.DuckStation.png|' squashfs-root/usr/share/applications/org.duckstation.DuckStation.desktop
+      sed -i 's|Exec=duckstation-qt %f|Exec=${SNAP}/usr/games/duckstation-qt %f|' squashfs-root/usr/share/applications/org.duckstation.DuckStation.desktop
+      sed -i 's|TryExec=duckstation-qt|TryExec=${SNAP}/usr/games/duckstation-qt|' squashfs-root/usr/share/applications/org.duckstation.DuckStation.desktop
+      mv -f squashfs-root/usr/bin $CRAFT_PART_INSTALL/usr/games
+      mv -f squashfs-root/usr/share/icons/hicolor/512x512/apps/org.duckstation.DuckStation.png $CRAFT_PART_INSTALL/usr/share/icons/hicolor/scalable/apps/
+      mv -f squashfs-root/usr/share/applications/org.duckstation.DuckStation.desktop $CRAFT_PART_INSTALL/usr/share/applications/
+      mv -f squashfs-root/usr/lib/libsoundtouch.so.2 $CRAFT_PART_INSTALL/usr/lib/x86_64-linux-gnu/
+      mv -f squashfs-root/usr/lib/libcpuinfo.so $CRAFT_PART_INSTALL/usr/lib/x86_64-linux-gnu/
+      mv -f squashfs-root/usr/lib/libshaderc_shared.so $CRAFT_PART_INSTALL/usr/lib/x86_64-linux-gnu/
+    prime:
+      - usr/games
+      - usr/share/applications/org.duckstation.DuckStation.desktop
+      - usr/share/icons/hicolor/scalable/apps/org.duckstation.DuckStation.png
+      - usr/lib/x86_64-linux-gnu
+
+  command-chain:
+    after: [duckstation-gpl]
+    plugin: nil
+    source: ./launcher
+    override-build: |
+      mkdir -p $CRAFT_PART_INSTALL/snap
+      cp -r command-chain $CRAFT_PART_INSTALL/snap/
+      chmod 777 $CRAFT_PART_INSTALL/snap/command-chain/*
+
+  dependencies:
+    after: [command-chain]
+    plugin: nil
+    stage-packages:
+      - libsdl2-2.0-0
+      - libjpeg9
+      - libdecor-0-0
+    prime:
+      - usr/lib/x86_64-linux-gnu/libSDL2-2.0*
+      - usr/lib/x86_64-linux-gnu/libjpeg.so*
+      - usr/lib/x86_64-linux-gnu/libdecor-0.so*
+
+layout:
+  /usr/share/X11:
+    symlink: $SNAP/kf6/usr/share/X11
+  /usr/share/qt6:
+    symlink: $SNAP/kf6/usr/share/qt6
+  /usr/share/libdrm:
+    bind: $SNAP/gpu-2404/libdrm
+  /usr/share/drirc.d:
+    symlink: $SNAP/gpu-2404/drirc.d
+  /etc/fonts:
+    bind: $SNAP/etc/fonts
